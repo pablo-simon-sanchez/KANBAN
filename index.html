@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tablero Kanban</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EEEAE1;
+    --paper-line:#D8D1C0;
+    --ink:#232A36;
+    --ink-soft:#5B6472;
+    --panel:#F8F6F0;
+    --danger:#B0432E;
+    --shadow: 0 1px 0 rgba(35,42,54,0.06);
+    --gris:#5B6472;
+    --gris-bg:#EAE8E2;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Inter',sans-serif;
+    background:
+      linear-gradient(var(--paper-line) 1px, transparent 1px) 0 0/100% 32px,
+      var(--paper);
+    color:var(--ink);
+    min-height:100vh;
+  }
+  header{
+    padding:36px 40px 16px;
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:16px;
+    border-bottom:1px solid var(--paper-line);
+    background:linear-gradient(180deg, rgba(238,234,225,0.95), rgba(238,234,225,0.75));
+  }
+  .brand-title-row{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:4px;
+  }
+  .brand h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:28px;
+    font-weight:700;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .board-name{
+    font-family:'Inter',sans-serif;
+    font-size:16px;
+    font-weight:500;
+    color:var(--ink-soft);
+  }
+  .board-name:before{content:'— ';}
+  .board-name:empty{display:none;}
+  .brand p{
+    margin:0;
+    color:var(--ink-soft);
+    font-size:14px;
+    max-width:48ch;
+  }
+  .actions{display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+  .actions-row{display:flex;gap:10px;flex-wrap:wrap;}
+  button, .file-btn{
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    font-weight:600;
+    padding:9px 16px;
+    border-radius:3px;
+    border:1px solid var(--ink);
+    background:transparent;
+    color:var(--ink);
+    cursor:pointer;
+    transition:background 0.12s ease, color 0.12s ease;
+  }
+  button:hover, .file-btn:hover{background:var(--ink);color:var(--panel);}
+  button.primary{background:var(--ink);color:var(--panel);}
+  button.primary:hover{background:#2F5FA3;border-color:#2F5FA3;}
+  input[type=file]{display:none;}
+  .status{
+    font-size:12px;
+    color:var(--ink-soft);
+    min-height:16px;
+    text-align:right;
+  }
+  .fs-note{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    max-width:280px;
+    text-align:right;
+    line-height:1.4;
+  }
+  /* Modal de guardado */
+  .modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(35,42,54,0.35);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:200;
+  }
+  .modal-overlay.hidden{display:none;}
+  .modal-box{
+    background:var(--panel);
+    border:1px solid var(--paper-line);
+    border-radius:3px;
+    padding:22px 24px;
+    width:320px;
+    max-width:90vw;
+    box-shadow:0 6px 24px rgba(35,42,54,0.18);
+  }
+  .modal-box h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:16px;
+    font-weight:600;
+    margin:0 0 14px;
+  }
+  .modal-box label{
+    display:block;
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .modal-input-row{
+    display:flex;
+    align-items:center;
+    border:1px solid var(--paper-line);
+    border-radius:2px;
+    background:var(--paper);
+    overflow:hidden;
+    margin-bottom:10px;
+  }
+  .modal-input-row input{
+    flex:1;
+    border:none;
+    background:transparent;
+    padding:8px 10px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    color:var(--ink);
+    outline:none;
+    min-width:0;
+  }
+  .modal-input-row span{
+    padding:8px 10px 8px 0;
+    font-size:13px;
+    color:var(--ink-soft);
+  }
+  .modal-hint{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-bottom:16px;
+    line-height:1.4;
+  }
+  .modal-buttons{
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+  }
+  main{
+    padding:28px 40px 60px;
+    display:flex;
+    gap:22px;
+    align-items:flex-start;
+    overflow-x:auto;
+  }
+  .column{
+    background:var(--panel);
+    border:1px solid var(--paper-line);
+    border-top:4px solid var(--col-accent, var(--gris));
+    border-radius:2px;
+    width:300px;
+    flex:0 0 300px;
+    display:flex;
+    flex-direction:column;
+    max-height:calc(100vh - 190px);
+  }
+  .column.drag-over{outline:2px dashed var(--ink-soft);outline-offset:-2px;}
+  .col-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 14px 10px;
+    gap:6px;
+  }
+  .col-head-left{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex:1;
+    min-width:0;
+  }
+  .color-picker-wrap{position:relative;flex:0 0 auto;}
+  .color-dot{
+    width:14px;height:14px;
+    border-radius:50%;
+    border:1px solid rgba(35,42,54,0.15);
+    flex:0 0 auto;
+    cursor:pointer;
+    padding:0;
+  }
+  .color-dot:hover{outline:1px solid var(--ink);outline-offset:1px;}
+  .color-popover{
+    position:absolute;
+    top:22px;left:0;
+    z-index:60;
+    background:var(--panel);
+    border:1px solid var(--paper-line);
+    border-radius:4px;
+    padding:8px;
+    box-shadow:0 6px 20px rgba(35,42,54,0.2);
+    display:grid;
+    grid-template-columns:repeat(5,18px);
+    gap:7px;
+  }
+  .color-popover button{
+    width:18px;height:18px;
+    border-radius:50%;
+    border:2px solid transparent;
+    padding:0;
+    cursor:pointer;
+  }
+  .color-popover button.selected{border-color:var(--ink);}
+  .col-title{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    outline:none;
+    padding:2px 4px;
+    border-radius:2px;
+    cursor:text;
+    min-width:0;
+    overflow-wrap:break-word;
+  }
+  .col-title:focus{background:rgba(35,42,54,0.06);}
+  .col-count{
+    font-size:12px;
+    color:var(--ink-soft);
+    font-variant-numeric:tabular-nums;
+    flex:0 0 auto;
+  }
+  .col-del{
+    background:none;border:none;color:var(--ink-soft);
+    font-size:16px;line-height:1;cursor:pointer;padding:2px 6px;
+    flex:0 0 auto;
+  }
+  .col-del:hover{color:var(--danger);background:none;}
+  .col-move{
+    background:none;border:none;color:var(--ink-soft);
+    font-size:13px;line-height:1;cursor:pointer;padding:2px 3px;
+    flex:0 0 auto;
+  }
+  .col-move:hover{color:var(--ink);background:none;}
+  .col-move:disabled{opacity:0.25;cursor:default;}
+  .col-move:disabled:hover{color:var(--ink-soft);}
+  .col-move-group{display:flex;flex:0 0 auto;}
+  .card-list{
+    padding:4px 12px 8px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    overflow-y:auto;
+    flex:1;
+    min-height:40px;
+  }
+  .card{
+    background:var(--paper);
+    border:1px solid var(--paper-line);
+    border-radius:2px;
+    padding:10px 12px 8px;
+    font-size:13.5px;
+    line-height:1.45;
+    cursor:grab;
+    position:relative;
+    box-shadow:var(--shadow);
+  }
+  .card.dragging{opacity:0.35;}
+  .card-top-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:6px;
+    margin-bottom:4px;
+  }
+  .card-number{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:11px;
+    font-weight:600;
+    color:var(--ink-soft);
+    letter-spacing:0.02em;
+    flex:0 0 auto;
+  }
+  .card-top-right{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    flex:0 0 auto;
+  }
+  .etiqueta-select{
+    font-family:'Inter',sans-serif;
+    font-size:11px;
+    font-weight:600;
+    padding:2px 6px;
+    border-radius:20px;
+    border:1px solid var(--paper-line);
+    background:var(--panel);
+    color:var(--ink-soft);
+    cursor:pointer;
+    flex:0 0 auto;
+  }
+  .field{
+    outline:none;
+    white-space:pre-wrap;
+    word-break:break-word;
+  }
+  .field:focus{background:rgba(35,42,54,0.04);}
+  .card-name{
+    font-weight:600;
+    font-size:14px;
+    margin-bottom:3px;
+    min-height:1.2em;
+  }
+  .card-name:empty::before{content:'Nombre de la tarea';color:var(--ink-soft);font-weight:400;}
+  .card-desc{
+    color:var(--ink-soft);
+    font-size:12.5px;
+    min-height:1.2em;
+    margin-bottom:8px;
+  }
+  .card-desc:empty::before{content:'Descripción (opcional)';color:#A8A198;}
+  .card-duration-row{
+    display:flex;
+    align-items:center;
+    gap:5px;
+  }
+  .duration-label{
+    font-size:10.5px;
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+    color:#A8A198;
+    flex:0 0 auto;
+  }
+  .card-duration{
+    font-size:12px;
+    font-weight:500;
+    padding:2px 7px;
+    border-radius:20px;
+    background:var(--col-accent-bg, var(--gris-bg));
+    color:var(--col-accent, var(--gris));
+    min-width:20px;
+    display:inline-block;
+  }
+  .card-duration:empty::before{content:'—';color:#A8A198;}
+  .progress-row{
+    display:flex;
+    gap:4px;
+    margin-top:9px;
+  }
+  .progress-btn{
+    flex:1;
+    font-family:'Inter',sans-serif;
+    font-size:10.5px;
+    font-weight:600;
+    padding:4px 0;
+    border:1px solid var(--paper-line);
+    border-radius:2px;
+    background:var(--panel);
+    color:var(--ink-soft);
+    cursor:pointer;
+  }
+  .progress-btn:hover{background:rgba(35,42,54,0.08);color:var(--ink);}
+  .progress-btn.active{background:var(--ink);color:var(--panel);border-color:var(--ink);}
+  .card-del{
+    background:none;border:none;
+    color:var(--ink-soft);
+    font-size:14px;
+    line-height:1;
+    padding:2px 4px;
+    cursor:pointer;
+    opacity:0;
+    transition:opacity 0.12s ease;
+    flex:0 0 auto;
+  }
+  .card:hover .card-del{opacity:1;}
+  .card-del:hover{color:var(--danger);background:none;}
+  .add-card{
+    margin:4px 12px 14px;
+    padding:8px 10px;
+    font-size:13px;
+    font-weight:500;
+    text-align:left;
+    color:var(--ink-soft);
+    border:1px dashed var(--paper-line);
+    border-radius:2px;
+    background:none;
+  }
+  .add-card:hover{background:none;border-color:var(--ink-soft);color:var(--ink);}
+  .add-column{
+    flex:0 0 220px;
+    align-self:flex-start;
+    margin-top:4px;
+    padding:12px 16px;
+    border:1px dashed var(--paper-line);
+    border-radius:2px;
+    color:var(--ink-soft);
+    background:none;
+    font-weight:500;
+  }
+  .add-column:hover{background:none;border-color:var(--ink-soft);color:var(--ink);}
+  @media (max-width:640px){
+    header,main{padding-left:18px;padding-right:18px;}
+    header{align-items:flex-start;}
+    .actions{align-items:flex-start;}
+    .status,.fs-note{text-align:left;}
+    main{flex-direction:column;}
+    .column{width:100%;flex:1 1 auto;max-height:none;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-title-row">
+      <h1>Tablero Kanban</h1>
+      <span class="board-name" id="boardName"></span>
+    </div>
+    <p>Los cambios viven en esta pestaña. Usa «Guardar en fichero» para elegir dónde guardarlo y «Cargar fichero» para retomarlo más tarde.</p>
+  </div>
+  <div class="actions">
+    <div class="actions-row">
+      <button class="primary" id="saveBtn">Guardar en fichero</button>
+      <button class="file-btn" id="loadBtn" type="button">Cargar fichero</button>
+      <input type="file" id="loadInput" accept="application/json">
+    </div>
+    <div class="status" id="status"></div>
+    <div class="fs-note" id="fsNote"></div>
+  </div>
+</header>
+
+<div class="modal-overlay hidden" id="saveModal">
+  <div class="modal-box">
+    <h2>Guardar tablero</h2>
+    <label for="fileNameInput">Nombre del fichero</label>
+    <div class="modal-input-row">
+      <input type="text" id="fileNameInput" autocomplete="off">
+      <span>.json</span>
+    </div>
+    <div class="modal-hint" id="modalHint"></div>
+    <div class="modal-buttons">
+      <button id="cancelSaveBtn">Cancelar</button>
+      <button class="primary" id="confirmSaveBtn">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<main id="board"></main>
+
+<script>
+/* ---------- Paletas ---------- */
+const COLUMN_PALETTE = [
+  { key:'azul',     name:'Azul',      color:'#2F5FA3', bg:'#E7EEF8' },
+  { key:'rojo',     name:'Rojo',      color:'#B0402E', bg:'#F7E7E3' },
+  { key:'amarillo', name:'Amarillo',  color:'#B3860A', bg:'#FBF1D6' },
+  { key:'verde',    name:'Verde',     color:'#3E7A4E', bg:'#E6F1E7' },
+  { key:'gris',     name:'Gris',      color:'#5B6472', bg:'#EAE8E2' },
+  { key:'morado',   name:'Morado',    color:'#7452A3', bg:'#EFE7F7' },
+  { key:'rosa',     name:'Rosa',      color:'#B15577', bg:'#F8E7EE' },
+  { key:'turquesa', name:'Turquesa',  color:'#2E8C8C', bg:'#E1F2F2' },
+  { key:'marron',   name:'Marrón',    color:'#8A5A3B', bg:'#F1E6DC' },
+  { key:'naranja',  name:'Naranja',   color:'#C1712E', bg:'#FAEADA' }
+];
+
+const LABEL_META = {
+  ''  : { name:'Sin etiqueta', bg:null,      chipBg:null,      ink:null },
+  'k1': { name:'k1', bg:'#F6D9DE', chipBg:'#F1BFC7', ink:'#8A3B48' }, // rosa
+  'k2': { name:'k2', bg:'#FADFC0', chipBg:'#F5C994', ink:'#8A5A20' }, // naranja
+  'k3': { name:'k3', bg:'#FBF0BE', chipBg:'#F5E28E', ink:'#8A6E12' }, // amarillo
+  'k4': { name:'k4', bg:'#E7E5DF', chipBg:'#D2CEC5', ink:'#565248' }  // gris
+};
+const LABEL_KEYS = ['', 'k1', 'k2', 'k3', 'k4'];
+const PROGRESS_STEPS = [25, 50, 75, 100];
+
+function colorMeta(key){
+  return COLUMN_PALETTE.find(p => p.key === key) || COLUMN_PALETTE.find(p => p.key === 'gris');
+}
+
+/* ---------- Estado ---------- */
+let state = {
+  boardName: '',
+  nextCardNumber: 4,
+  columns: [
+    { id: cid(), title: 'Por hacer', color: 'azul', cards: [
+      { id: cid(), numero:'0001', nombre: 'Arrastra una tarjeta', descripcion: 'Muévela a otra columna soltándola encima', duracion: '', etiqueta: '', progreso: 0 },
+      { id: cid(), numero:'0002', nombre: 'Haz clic en un campo para editarlo', descripcion: '', duracion: '', etiqueta: 'k1', progreso: 25 }
+    ]},
+    { id: cid(), title: 'En curso', color: 'rojo', cards: [
+      { id: cid(), numero:'0003', nombre: 'Añade tarjetas con "+ Añadir tarjeta"', descripcion: 'Cada tarjeta tiene nombre, descripción y duración', duracion: '2h', etiqueta: 'k2', progreso: 50 }
+    ]},
+    { id: cid(), title: 'En revisión', color: 'amarillo', cards: [] },
+    { id: cid(), title: 'Hecho', color: 'verde', cards: [] }
+  ]
+};
+
+function cid(){
+  return 'id-' + Math.random().toString(36).slice(2,10);
+}
+
+function nextCardNumber(){
+  const n = state.nextCardNumber || 1;
+  state.nextCardNumber = n + 1;
+  return String(n).padStart(4, '0');
+}
+
+function setStatus(msg){
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  if(msg) setTimeout(()=>{ if(el.textContent===msg) el.textContent=''; }, 5000);
+}
+
+function updateBoardNameLabel(){
+  document.getElementById('boardName').textContent = state.boardName || '';
+}
+
+let dragCardId = null;
+let dragFromCol = null;
+let openColorPickerId = null;
+
+/* ---------- Render ---------- */
+function render(){
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+
+  state.columns.forEach(col => {
+    if(!col.color || !COLUMN_PALETTE.some(p => p.key === col.color)) col.color = 'gris';
+    const meta = colorMeta(col.color);
+
+    const colEl = document.createElement('div');
+    colEl.className = 'column';
+    colEl.dataset.colId = col.id;
+    colEl.style.setProperty('--col-accent', meta.color);
+    colEl.style.setProperty('--col-accent-bg', meta.bg);
+
+    const head = document.createElement('div');
+    head.className = 'col-head';
+
+    const left = document.createElement('div');
+    left.className = 'col-head-left';
+
+    const colorWrap = document.createElement('div');
+    colorWrap.className = 'color-picker-wrap';
+
+    const dot = document.createElement('button');
+    dot.className = 'color-dot';
+    dot.style.background = meta.color;
+    dot.title = 'Cambiar color de estado';
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openColorPickerId = (openColorPickerId === col.id) ? null : col.id;
+      render();
+    });
+    colorWrap.appendChild(dot);
+
+    if(openColorPickerId === col.id){
+      const pop = document.createElement('div');
+      pop.className = 'color-popover';
+      COLUMN_PALETTE.forEach(p => {
+        const swatch = document.createElement('button');
+        swatch.style.background = p.color;
+        swatch.title = p.name;
+        if(col.color === p.key) swatch.classList.add('selected');
+        swatch.addEventListener('click', (e) => {
+          e.stopPropagation();
+          col.color = p.key;
+          openColorPickerId = null;
+          render();
+        });
+        pop.appendChild(swatch);
+      });
+      pop.addEventListener('click', e => e.stopPropagation());
+      colorWrap.appendChild(pop);
+    }
+
+    const title = document.createElement('div');
+    title.className = 'col-title';
+    title.contentEditable = 'true';
+    title.spellcheck = false;
+    title.textContent = col.title;
+    title.addEventListener('blur', () => {
+      col.title = title.textContent.trim() || 'Sin título';
+      title.textContent = col.title;
+    });
+    title.addEventListener('keydown', e => {
+      if(e.key === 'Enter'){ e.preventDefault(); title.blur(); }
+    });
+
+    left.appendChild(colorWrap);
+    left.appendChild(title);
+
+    const count = document.createElement('div');
+    count.className = 'col-count';
+    count.textContent = col.cards.length;
+
+    const del = document.createElement('button');
+    del.className = 'col-del';
+    del.textContent = '✕';
+    del.title = 'Eliminar columna';
+    del.addEventListener('click', () => {
+      if(col.cards.length && !confirm('Esta columna tiene tarjetas. ¿Eliminarla igualmente?')) return;
+      state.columns = state.columns.filter(c => c.id !== col.id);
+      render();
+    });
+
+    const moveGroup = document.createElement('div');
+    moveGroup.className = 'col-move-group';
+    const colIdx = state.columns.indexOf(col);
+
+    const moveLeft = document.createElement('button');
+    moveLeft.className = 'col-move';
+    moveLeft.textContent = '◀';
+    moveLeft.title = 'Mover columna a la izquierda';
+    moveLeft.disabled = colIdx === 0;
+    moveLeft.addEventListener('click', () => moveColumn(col.id, -1));
+
+    const moveRight = document.createElement('button');
+    moveRight.className = 'col-move';
+    moveRight.textContent = '▶';
+    moveRight.title = 'Mover columna a la derecha';
+    moveRight.disabled = colIdx === state.columns.length - 1;
+    moveRight.addEventListener('click', () => moveColumn(col.id, 1));
+
+    moveGroup.appendChild(moveLeft);
+    moveGroup.appendChild(moveRight);
+
+    head.appendChild(left);
+    head.appendChild(count);
+    head.appendChild(moveGroup);
+    head.appendChild(del);
+    colEl.appendChild(head);
+
+    const list = document.createElement('div');
+    list.className = 'card-list';
+
+    col.cards.forEach(card => {
+      list.appendChild(renderCard(card, col));
+    });
+
+    list.addEventListener('dragover', e => {
+      e.preventDefault();
+      colEl.classList.add('drag-over');
+    });
+    list.addEventListener('dragleave', () => colEl.classList.remove('drag-over'));
+    list.addEventListener('drop', e => {
+      e.preventDefault();
+      colEl.classList.remove('drag-over');
+      moveCard(dragCardId, dragFromCol, col.id, null);
+    });
+
+    colEl.appendChild(list);
+
+    const addCardBtn = document.createElement('button');
+    addCardBtn.className = 'add-card';
+    addCardBtn.textContent = '+ Añadir tarjeta';
+    addCardBtn.addEventListener('click', () => {
+      const newCard = { id: cid(), numero: nextCardNumber(), nombre: '', descripcion: '', duracion: '', etiqueta: '', progreso: 0 };
+      col.cards.push(newCard);
+      render();
+      const el = document.querySelector(`[data-card-id="${newCard.id}"] .card-name`);
+      if(el){ el.focus(); }
+    });
+
+    colEl.appendChild(addCardBtn);
+    board.appendChild(colEl);
+  });
+
+  const addColBtn = document.createElement('button');
+  addColBtn.className = 'add-column';
+  addColBtn.textContent = '+ Añadir columna';
+  addColBtn.addEventListener('click', () => {
+    state.columns.push({ id: cid(), title: 'Nueva columna', color: 'gris', cards: [] });
+    render();
+  });
+  board.appendChild(addColBtn);
+}
+
+document.addEventListener('click', () => {
+  if(openColorPickerId){ openColorPickerId = null; render(); }
+});
+
+function renderCard(card, col){
+  if(card.etiqueta === undefined) card.etiqueta = '';
+  if(card.progreso === undefined) card.progreso = 0;
+
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.draggable = true;
+  el.dataset.cardId = card.id;
+
+  el.addEventListener('dragstart', e => {
+    dragCardId = card.id;
+    dragFromCol = col.id;
+    el.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  el.addEventListener('dragend', () => el.classList.remove('dragging'));
+  el.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  el.addEventListener('drop', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    moveCard(dragCardId, dragFromCol, col.id, card.id);
+  });
+
+  function applyLabelStyle(){
+    const meta = LABEL_META[card.etiqueta] || LABEL_META[''];
+    el.style.background = meta.bg || '';
+    etiquetaSelect.style.background = meta.chipBg || '';
+    etiquetaSelect.style.color = meta.ink || '';
+    etiquetaSelect.style.borderColor = meta.chipBg || 'var(--paper-line)';
+  }
+
+  function removeIfEmpty(){
+    if(!card.nombre && !card.descripcion && !card.duracion){
+      col.cards = col.cards.filter(c => c.id !== card.id);
+      render();
+    }
+  }
+
+  const topRow = document.createElement('div');
+  topRow.className = 'card-top-row';
+
+  const numberTag = document.createElement('span');
+  numberTag.className = 'card-number';
+  numberTag.textContent = '#' + card.numero;
+
+  const rightGroup = document.createElement('div');
+  rightGroup.className = 'card-top-right';
+
+  const etiquetaSelect = document.createElement('select');
+  etiquetaSelect.className = 'etiqueta-select';
+  etiquetaSelect.title = 'Etiqueta';
+  LABEL_KEYS.forEach(key => {
+    const opt = document.createElement('option');
+    opt.value = key;
+    opt.textContent = LABEL_META[key].name;
+    if(card.etiqueta === key) opt.selected = true;
+    etiquetaSelect.appendChild(opt);
+  });
+  etiquetaSelect.addEventListener('change', () => {
+    card.etiqueta = etiquetaSelect.value;
+    applyLabelStyle();
+  });
+  etiquetaSelect.addEventListener('mousedown', e => e.stopPropagation());
+  etiquetaSelect.addEventListener('click', e => e.stopPropagation());
+
+  const del = document.createElement('button');
+  del.className = 'card-del';
+  del.textContent = '✕';
+  del.title = 'Eliminar tarjeta';
+  del.addEventListener('click', () => {
+    col.cards = col.cards.filter(c => c.id !== card.id);
+    render();
+  });
+
+  rightGroup.appendChild(etiquetaSelect);
+  rightGroup.appendChild(del);
+  topRow.appendChild(numberTag);
+  topRow.appendChild(rightGroup);
+
+  const name = document.createElement('div');
+  name.className = 'field card-name';
+  name.contentEditable = 'true';
+  name.spellcheck = false;
+  name.textContent = card.nombre;
+  name.addEventListener('blur', () => {
+    card.nombre = name.textContent.trim();
+    name.textContent = card.nombre;
+    removeIfEmpty();
+  });
+  name.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){ e.preventDefault(); name.blur(); }
+  });
+
+  const desc = document.createElement('div');
+  desc.className = 'field card-desc';
+  desc.contentEditable = 'true';
+  desc.spellcheck = false;
+  desc.textContent = card.descripcion;
+  desc.addEventListener('blur', () => {
+    card.descripcion = desc.textContent.trim();
+    desc.textContent = card.descripcion;
+    removeIfEmpty();
+  });
+  desc.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); desc.blur(); }
+  });
+
+  const durationRow = document.createElement('div');
+  durationRow.className = 'card-duration-row';
+
+  const durationLabel = document.createElement('div');
+  durationLabel.className = 'duration-label';
+  durationLabel.textContent = 'Duración';
+
+  const duration = document.createElement('div');
+  duration.className = 'field card-duration';
+  duration.contentEditable = 'true';
+  duration.spellcheck = false;
+  duration.textContent = card.duracion;
+  duration.addEventListener('blur', () => {
+    card.duracion = duration.textContent.trim();
+    duration.textContent = card.duracion;
+    removeIfEmpty();
+  });
+  duration.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){ e.preventDefault(); duration.blur(); }
+  });
+
+  durationRow.appendChild(durationLabel);
+  durationRow.appendChild(duration);
+
+  const progressRow = document.createElement('div');
+  progressRow.className = 'progress-row';
+  PROGRESS_STEPS.forEach(val => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'progress-btn';
+    btn.textContent = val + '%';
+    if(card.progreso === val) btn.classList.add('active');
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      card.progreso = (card.progreso === val) ? 0 : val;
+      Array.from(progressRow.children).forEach(b => b.classList.remove('active'));
+      if(card.progreso){
+        progressRow.children[PROGRESS_STEPS.indexOf(card.progreso)].classList.add('active');
+      }
+    });
+    progressRow.appendChild(btn);
+  });
+
+  el.appendChild(topRow);
+  el.appendChild(name);
+  el.appendChild(desc);
+  el.appendChild(durationRow);
+  el.appendChild(progressRow);
+
+  applyLabelStyle();
+  return el;
+}
+
+function moveColumn(colId, direction){
+  const idx = state.columns.findIndex(c => c.id === colId);
+  const newIdx = idx + direction;
+  if(newIdx < 0 || newIdx >= state.columns.length) return;
+  const [col] = state.columns.splice(idx, 1);
+  state.columns.splice(newIdx, 0, col);
+  render();
+}
+
+function moveCard(cardId, fromColId, toColId, beforeCardId){
+  if(!cardId) return;
+  const fromCol = state.columns.find(c => c.id === fromColId);
+  const toCol = state.columns.find(c => c.id === toColId);
+  if(!fromCol || !toCol) return;
+  const cardIdx = fromCol.cards.findIndex(c => c.id === cardId);
+  if(cardIdx === -1) return;
+  const [card] = fromCol.cards.splice(cardIdx, 1);
+
+  if(beforeCardId){
+    const insertIdx = toCol.cards.findIndex(c => c.id === beforeCardId);
+    toCol.cards.splice(insertIdx === -1 ? toCol.cards.length : insertIdx, 0, card);
+  } else {
+    toCol.cards.push(card);
+  }
+  render();
+}
+
+/* ---------- Compatibilidad con ficheros anteriores ---------- */
+function migrateState(parsed){
+  parsed.columns.forEach(c => {
+    if(!c.color || !COLUMN_PALETTE.some(p => p.key === c.color)) c.color = 'gris';
+  });
+  let maxN = 0;
+  parsed.columns.forEach(c => (c.cards || []).forEach(card => {
+    if(card.nombre === undefined){
+      card.nombre = card.text || '';
+      card.descripcion = '';
+      card.duracion = '';
+    }
+    if(card.etiqueta === undefined) card.etiqueta = '';
+    if(card.progreso === undefined) card.progreso = 0;
+    if(card.numero){
+      const n = parseInt(card.numero, 10);
+      if(!isNaN(n) && n > maxN) maxN = n;
+    }
+  }));
+  parsed.nextCardNumber = parsed.nextCardNumber || (maxN + 1) || 1;
+  parsed.columns.forEach(c => (c.cards || []).forEach(card => {
+    if(!card.numero){
+      card.numero = String(parsed.nextCardNumber).padStart(4, '0');
+      parsed.nextCardNumber++;
+    }
+  }));
+  return parsed;
+}
+
+function loadStateFromText(text, fileName){
+  try{
+    const parsed = JSON.parse(text);
+    if(!parsed.columns || !Array.isArray(parsed.columns)) throw new Error('Formato no válido');
+    migrateState(parsed);
+    parsed.boardName = fileName.replace(/\.[^/.]+$/, '');
+    state = parsed;
+    render();
+    updateBoardNameLabel();
+    setStatus('Tablero cargado desde ' + fileName);
+  }catch(err){
+    setStatus('No se pudo leer el fichero: formato no válido');
+  }
+}
+
+/* ---------- Guardar / Cargar con selección de carpeta ---------- */
+const hasFSAccess = ('showOpenFilePicker' in window) && ('showSaveFilePicker' in window);
+let currentFileHandle = null;
+
+const saveModal = document.getElementById('saveModal');
+const fileNameInput = document.getElementById('fileNameInput');
+const modalHint = document.getElementById('modalHint');
+
+function sanitizeFileName(name){
+  const cleaned = name.replace(/[\\/:*?"<>|]/g, '').trim();
+  return cleaned || 'tablero-kanban';
+}
+
+function openSaveModal(){
+  fileNameInput.value = state.boardName || 'tablero-kanban';
+  modalHint.textContent = hasFSAccess
+    ? (currentFileHandle ? 'Se abrirá el selector de carpeta, partiendo del directorio del fichero abierto.' : 'Se abrirá el selector de carpeta de tu sistema.')
+    : 'Tu navegador descargará el fichero a la carpeta de Descargas.';
+  saveModal.classList.remove('hidden');
+  fileNameInput.focus();
+  fileNameInput.select();
+}
+
+function closeSaveModal(){
+  saveModal.classList.add('hidden');
+}
+
+async function confirmSave(){
+  const name = sanitizeFileName(fileNameInput.value);
+  state.boardName = name;
+  updateBoardNameLabel();
+  const json = JSON.stringify(state, null, 2);
+
+  if(hasFSAccess){
+    try{
+      const opts = {
+        suggestedName: name + '.json',
+        types: [{ description: 'Tablero Kanban', accept: { 'application/json': ['.json'] } }]
+      };
+      if(currentFileHandle) opts.startIn = currentFileHandle;
+      const handle = await window.showSaveFilePicker(opts);
+      const writable = await handle.createWritable();
+      await writable.write(json);
+      await writable.close();
+      currentFileHandle = handle;
+      closeSaveModal();
+      setStatus('Guardado en ' + handle.name);
+      return;
+    }catch(err){
+      if(err && err.name === 'AbortError'){
+        setStatus('Guardado cancelado.');
+        return;
+      }
+      // Si el navegador soporta la API pero el contexto (p.ej. iframe) la bloquea, degradamos con normalidad
+    }
+  }
+
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  closeSaveModal();
+  setStatus('Fichero descargado: ' + name + '.json');
+}
+
+document.getElementById('saveBtn').addEventListener('click', openSaveModal);
+document.getElementById('cancelSaveBtn').addEventListener('click', closeSaveModal);
+document.getElementById('confirmSaveBtn').addEventListener('click', confirmSave);
+saveModal.addEventListener('click', e => { if(e.target === saveModal) closeSaveModal(); });
+fileNameInput.addEventListener('keydown', e => {
+  if(e.key === 'Enter'){ e.preventDefault(); confirmSave(); }
+  if(e.key === 'Escape'){ e.preventDefault(); closeSaveModal(); }
+});
+
+async function openFileWithPicker(){
+  try{
+    const [handle] = await window.showOpenFilePicker({
+      types: [{ description: 'Tablero Kanban', accept: { 'application/json': ['.json'] } }],
+      multiple: false
+    });
+    const file = await handle.getFile();
+    const text = await file.text();
+    loadStateFromText(text, file.name);
+    currentFileHandle = handle;
+  }catch(err){
+    if(err && err.name === 'AbortError') return;
+    document.getElementById('loadInput').click();
+  }
+}
+
+document.getElementById('loadBtn').addEventListener('click', () => {
+  if(hasFSAccess){ openFileWithPicker(); }
+  else { document.getElementById('loadInput').click(); }
+});
+
+document.getElementById('loadInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    currentFileHandle = null; // sin API de sistema de ficheros no hay handle que reutilizar
+    loadStateFromText(reader.result, file.name);
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+/* ---------- Autoguardado cada 5 minutos ---------- */
+setInterval(async () => {
+  if(!currentFileHandle) return;
+  try{
+    const writable = await currentFileHandle.createWritable();
+    await writable.write(JSON.stringify(state, null, 2));
+    await writable.close();
+    setStatus('Autoguardado ✓ ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }));
+  }catch(err){
+    // si se pierde el permiso o el fichero, no interrumpimos al usuario
+  }
+}, 5 * 60 * 1000);
+
+/* ---------- Inicio ---------- */
+document.getElementById('fsNote').textContent = hasFSAccess
+  ? 'Puedes elegir carpeta al guardar; con un fichero abierto, el autoguardado lo sobrescribe cada 5 min.'
+  : 'Este navegador no permite elegir carpeta ni autoguardar aquí: se descargará a Descargas cada vez.';
+
+render();
+updateBoardNameLabel();
+</script>
+</body>
+</html>
